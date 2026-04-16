@@ -1,15 +1,15 @@
 name: Daily News Brief
 
 on:
-  # Runs at 00:00 UTC = 08:00 CST every day
+  # 00:00 UTC = 08:00 CST every morning
   schedule:
     - cron: '0 0 * * *'
 
-  # Manual trigger from GitHub Actions tab (for testing)
+  # Manual trigger — use "Run workflow" in the Actions tab to test right now
   workflow_dispatch:
     inputs:
       dry_run:
-        description: 'Dry run (print brief, do not push)'
+        description: 'Dry run — print brief without sending'
         type: boolean
         default: false
 
@@ -19,36 +19,90 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - name: Trigger daily brief on Railway
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # Restore cached DB + title cache from the previous run so we
+      # remember subscribers and don't repeat yesterday's stories.
+      - name: Restore persistent data
+        uses: actions/cache@v4
+        with:
+          path: |
+            subscribers.db
+            .title_cache.txt
+          key: daily-brief-data-${{ github.run_number }}
+          restore-keys: |
+            daily-brief-data-
+
+      # On first run (empty DB) seed from GitHub Secrets.
+      # Add more subscribers by updating the SUBSCRIBERS_JSON secret.
+      - name: Seed subscribers if DB is empty
+        env:
+          SUBSCRIBERS_JSON: ${{ secrets.SUBSCRIBERS_JSON }}
+          DB_PATH: subscribers.db
         run: |
-          echo "Triggering daily brief at $(date -u '+%Y-%m-%d %H:%M UTC')"
+          python - <<'PYEOF'
+          import os, json
+          from database import init_db, add_subscriber, subscriber_count
 
+          init_db()
+          if subscriber_count() > 0:
+              print(f"DB has {subscriber_count()} subscriber(s) — skipping seed.")
+          else:
+              raw = os.environ.get("SUBSCRIBERS_JSON", "[]")
+              try:
+                  subs = json.loads(raw)
+              except json.JSONDecodeError:
+                  print("SUBSCRIBERS_JSON is empty or invalid — no subscribers seeded.")
+                  subs = []
+              for s in subs:
+                  try:
+                      add_subscriber(
+                          delivery_method=s["delivery_method"],
+                          delivery_target=s["delivery_target"],
+                          topics=s.get("topics", []),
+                          name=s.get("name", ""),
+                      )
+                      print(f"  Seeded: {s['delivery_method']} / {s['delivery_target'][:20]}...")
+                  except Exception as e:
+                      print(f"  Seed error: {e}")
+              print(f"Seed complete — {subscriber_count()} subscriber(s) in DB.")
+          PYEOF
+
+      - name: Run daily brief
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SERVERCHAN_KEY:    ${{ secrets.SERVERCHAN_KEY }}
+          EMAIL_HOST:        ${{ vars.EMAIL_HOST }}
+          EMAIL_PORT:        ${{ vars.EMAIL_PORT }}
+          EMAIL_USER:        ${{ secrets.EMAIL_USER }}
+          EMAIL_PASS:        ${{ secrets.EMAIL_PASS }}
+          PUSH_MODE:         serverchan
+          DB_PATH:           subscribers.db
+          LOG_LEVEL:         INFO
+        run: |
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
-            echo "DRY RUN — skipping actual send"
-            exit 0
+            echo "=== DRY RUN ==="
+            python main.py --dry-run --no-cache
+          else
+            python main.py --all-subscribers
           fi
 
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
-            "${{ secrets.APP_URL }}/admin/run" \
-            -H "X-Admin-Secret: ${{ secrets.ADMIN_SECRET }}" \
-            --max-time 120)
-
-          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-          BODY=$(echo "$RESPONSE" | head -1)
-
-          echo "Response: $BODY"
-          echo "HTTP status: $HTTP_CODE"
-
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "ERROR: Request failed with status $HTTP_CODE"
-            exit 1
-          fi
-
-          # Parse sent/failed counts from JSON response
-          SENT=$(echo "$BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('sent',0))" 2>/dev/null || echo "?")
-          FAILED=$(echo "$BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('failed',0))" 2>/dev/null || echo "?")
-          echo "Result: sent=$SENT failed=$FAILED"
-
-          if [ "$FAILED" != "0" ] && [ "$FAILED" != "?" ]; then
-            echo "WARNING: $FAILED sends failed"
-          fi
+      # Save DB and cache back so the next run picks them up
+      - name: Save persistent data
+        if: always()
+        uses: actions/cache@v4
+        with:
+          path: |
+            subscribers.db
+            .title_cache.txt
+          key: daily-brief-data-${{ github.run_number }}
