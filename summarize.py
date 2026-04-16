@@ -36,10 +36,10 @@ class ArticleSummary:
     source: str
 
 
-# ── Prompt ────────────────────────────────────────────────────────────────────
+# ── Prompts ───────────────────────────────────────────────────────────────────
 
-_SYSTEM_PROMPT = """\
-You are a concise technology journalist writing a daily AI news brief.
+_SYSTEM_PROMPT_EN = """\
+You are a concise news journalist writing a daily news brief.
 Rules you must follow:
 1. Never copy or quote the source text directly. Always paraphrase.
 2. Keep the entire response under 120 words.
@@ -49,7 +49,7 @@ Rules you must follow:
 6. The "title" field must be a clean, engaging headline (≤12 words).
 """
 
-_USER_TEMPLATE = """\
+_USER_TEMPLATE_EN = """\
 Summarise the article below in your own words.
 Return JSON with exactly three keys: "title", "summary", "why_it_matters".
 
@@ -58,6 +58,33 @@ Article title: {title}
 Article content:
 {content}
 """
+
+_SYSTEM_PROMPT_ZH = """\
+你是一位简洁的新闻记者，正在撰写每日新闻简报。
+你必须遵守以下规则：
+1. 绝对不要直接抄写或引用原文，务必用自己的语言改写。
+2. 整个回答不超过150个字。
+3. 只返回有效的JSON，不要使用Markdown代码块，不要添加多余的键。
+4. "summary"字段必须是2-3句话。
+5. "why_it_matters"字段必须恰好是1句话。
+6. "title"字段必须是简洁有吸引力的中文标题（不超过20个字）。
+所有字段的内容必须用中文书写。
+"""
+
+_USER_TEMPLATE_ZH = """\
+请用你自己的语言概括以下文章，全程使用中文。
+返回JSON，包含三个键："title"（标题）、"summary"（摘要）、"why_it_matters"（重要性）。
+
+文章标题：{title}
+
+文章内容：
+{content}
+"""
+
+_PROMPTS = {
+    "en": (_SYSTEM_PROMPT_EN, _USER_TEMPLATE_EN),
+    "zh": (_SYSTEM_PROMPT_ZH, _USER_TEMPLATE_ZH),
+}
 
 
 # ── Anthropic client (lazy singleton) ─────────────────────────────────────────
@@ -74,7 +101,7 @@ def _get_client() -> anthropic.Anthropic:
 
 # ── Core summarisation ────────────────────────────────────────────────────────
 
-def _call_llm(title: str, content: str) -> dict:
+def _call_llm(title: str, content: str, language: str = "en") -> dict:
     """
     Call Claude and parse the JSON response.
 
@@ -82,7 +109,8 @@ def _call_llm(title: str, content: str) -> dict:
     Retries on rate-limit / transient errors with exponential back-off.
     Raises ValueError if parsing fails after all retries.
     """
-    user_msg = _USER_TEMPLATE.format(
+    system_prompt, user_template = _PROMPTS.get(language, _PROMPTS["en"])
+    user_msg = user_template.format(
         title=title,
         content=content[: config.MAX_INPUT_CHARS],
     )
@@ -96,7 +124,7 @@ def _call_llm(title: str, content: str) -> dict:
             message = client.messages.create(
                 model=config.ANTHROPIC_MODEL,
                 max_tokens=300,
-                system=_SYSTEM_PROMPT,
+                system=system_prompt,
                 messages=[{"role": "user", "content": user_msg}],
             )
 
@@ -149,7 +177,7 @@ def _call_llm(title: str, content: str) -> dict:
     )
 
 
-def summarise_article(article: Article) -> Optional[ArticleSummary]:
+def summarise_article(article: Article, language: str = "en") -> Optional[ArticleSummary]:
     """
     Summarise a single article.
 
@@ -163,9 +191,9 @@ def summarise_article(article: Article) -> Optional[ArticleSummary]:
         logger.warning("No content available for: %s", article.title)
         return None
 
-    logger.info("Summarising: %s", article.title[:70])
+    logger.info("Summarising [%s]: %s", language, article.title[:70])
     try:
-        data = _call_llm(article.title, content)
+        data = _call_llm(article.title, content, language=language)
         return ArticleSummary(
             title=data["title"].strip(),
             summary=data["summary"].strip(),
@@ -178,40 +206,46 @@ def summarise_article(article: Article) -> Optional[ArticleSummary]:
         return None
 
 
-def summarise_all(articles: list[Article]) -> list[ArticleSummary]:
+def summarise_all(articles: list[Article], language: str = "en") -> list[ArticleSummary]:
     """
     Summarise a list of articles, skipping any that fail.
 
     Args:
         articles: Pre-ranked articles from rank.py
+        language: 'en' for English, 'zh' for Chinese
 
     Returns:
         List of ArticleSummary (may be shorter than input if some fail).
     """
     summaries: list[ArticleSummary] = []
     for article in articles:
-        result = summarise_article(article)
+        result = summarise_article(article, language=language)
         if result:
             summaries.append(result)
         # Small politeness delay between API calls
         time.sleep(0.3)
 
     logger.info(
-        "Summarised %d/%d articles successfully.",
-        len(summaries), len(articles),
+        "Summarised %d/%d articles successfully [%s].",
+        len(summaries), len(articles), language,
     )
     return summaries
 
 
 # ── Message formatter ─────────────────────────────────────────────────────────
 
-def format_brief(summaries: list[ArticleSummary], date_str: str = "") -> str:
+def format_brief(
+    summaries: list[ArticleSummary],
+    date_str: str = "",
+    language: str = "en",
+) -> str:
     """
     Render summaries as the final plain-text brief.
 
     Args:
         summaries: List of ArticleSummary objects.
         date_str:  Human-readable date to include in the header.
+        language:  'en' (default) or 'zh' for Chinese formatting.
 
     Returns:
         Formatted string ready to push to WeChat / WeCom.
@@ -219,25 +253,44 @@ def format_brief(summaries: list[ArticleSummary], date_str: str = "") -> str:
     from datetime import date as _date
 
     header_date = date_str or _date.today().strftime("%Y-%m-%d")
-    lines: list[str] = [
-        f"【Daily AI Brief】{header_date}",
-        "=" * 36,
-        "",
-    ]
 
-    for i, s in enumerate(summaries, 1):
-        lines += [
-            f"{i}. {s.title}",
-            f"   {s.summary}",
-            f"   Why it matters: {s.why_it_matters}",
-            f"   🔗 {s.url}",
-            f"   — {s.source}",
+    if language == "zh":
+        lines: list[str] = [
+            f"【每日新闻简报】{header_date}",
+            "=" * 36,
             "",
         ]
-
-    lines += [
-        "─" * 36,
-        f"Powered by Daily AI Brief • {header_date}",
-    ]
+        for i, s in enumerate(summaries, 1):
+            lines += [
+                f"{i}. {s.title}",
+                f"   {s.summary}",
+                f"   重要性：{s.why_it_matters}",
+                f"   🔗 {s.url}",
+                f"   — {s.source}",
+                "",
+            ]
+        lines += [
+            "─" * 36,
+            f"每日新闻简报 • {header_date}",
+        ]
+    else:
+        lines = [
+            f"【Daily News Brief】{header_date}",
+            "=" * 36,
+            "",
+        ]
+        for i, s in enumerate(summaries, 1):
+            lines += [
+                f"{i}. {s.title}",
+                f"   {s.summary}",
+                f"   Why it matters: {s.why_it_matters}",
+                f"   🔗 {s.url}",
+                f"   — {s.source}",
+                "",
+            ]
+        lines += [
+            "─" * 36,
+            f"Powered by Daily News Brief • {header_date}",
+        ]
 
     return "\n".join(lines)

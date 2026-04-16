@@ -118,8 +118,20 @@ def _brief_to_html(title: str, body: str) -> str:
         elif line.startswith("Why it matters:"):
             paragraphs += f'<p style="background:#f0eeff;border-left:3px solid #6C5CE7;padding:8px 12px;border-radius:4px">{line}</p>'
         elif line.startswith("🔗"):
-            href = line.replace("🔗 ", "")
-            paragraphs += f'<p><a href="{href}" style="color:#6C5CE7">Read full article →</a></p>'
+            href = line[1:].strip()
+            # Table-wrapped button — renders reliably in Gmail mobile
+            paragraphs += (
+                f'<table width="100%" cellpadding="0" cellspacing="0" border="0"'
+                f' style="margin:6px 0 14px">'
+                f'<tr><td style="padding:0">'
+                f'<a href="{href}" target="_blank" rel="noopener noreferrer"'
+                f' style="display:inline-block;padding:10px 20px;background:#6C5CE7;'
+                f'color:#ffffff !important;text-decoration:none !important;'
+                f'border-radius:6px;font-size:14px;font-weight:700;line-height:1;'
+                f'font-family:-apple-system,sans-serif">'
+                f'Read full article &#8594;</a>'
+                f'</td></tr></table>'
+            )
         else:
             paragraphs += f'<p style="color:#555;line-height:1.7">{line}</p>'
 

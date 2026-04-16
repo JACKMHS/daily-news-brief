@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 import re
 from datetime import datetime, timezone
-from math import exp
+from math import exp, log2
 from pathlib import Path
 from typing import Optional
 
@@ -133,6 +133,45 @@ def deduplicate(articles: list[Article]) -> list[Article]:
     return kept
 
 
+# ── Cross-source coverage boost ──────────────────────────────────────────────
+
+def boost_by_coverage(articles: list[Article]) -> list[Article]:
+    """
+    Boost articles that are covered by multiple sources (i.e. trending).
+
+    Groups articles by bigram Jaccard similarity. Each article in a group of
+    N sources gets its score multiplied by log2(N + 1).  A story covered by
+    3 outlets scores ~2× a solo story; 7 outlets ~3×.
+
+    Must be called *before* deduplicate() so the coverage signal isn't lost.
+    """
+    n = len(articles)
+    group_size = [1] * n      # how many sources cover story i
+    assigned = [False] * n
+
+    for i in range(n):
+        if assigned[i]:
+            continue
+        assigned[i] = True
+        for j in range(i + 1, n):
+            if not assigned[j]:
+                sim = _jaccard(articles[i].title, articles[j].title)
+                if sim >= config.DEDUP_THRESHOLD:
+                    group_size[i] += 1
+                    group_size[j] = group_size[i]   # keep in sync
+                    assigned[j] = True
+
+    for i, art in enumerate(articles):
+        if group_size[i] > 1:
+            art.score *= log2(group_size[i] + 1)
+            logger.debug(
+                "Coverage boost ×%.2f (sources=%d): %s",
+                log2(group_size[i] + 1), group_size[i], art.title[:60],
+            )
+
+    return articles
+
+
 # ── Age filter ────────────────────────────────────────────────────────────────
 
 def filter_by_age(articles: list[Article]) -> list[Article]:
@@ -224,12 +263,14 @@ def select_candidate_pool(
     for art in articles:
         art.score = _recency_score(_age_hours(art))
 
+    # Boost trending stories before dedup so the coverage signal isn't lost
+    articles = boost_by_coverage(articles)
     articles.sort(key=lambda a: a.score, reverse=True)
     articles = deduplicate(articles)
     selected = articles[:pool_size]
 
     logger.info(
-        "Candidate pool: %d articles (recency-only, diverse topics).",
+        "Candidate pool: %d articles (recency + coverage boost).",
         len(selected),
     )
     return selected
@@ -274,6 +315,9 @@ def select_top(articles: list[Article], top_n: Optional[int] = None) -> list[Art
     # 3 – Score
     for art in articles:
         art.score = score_article(art)
+
+    # 3b – Boost stories covered by multiple sources (trending signal)
+    articles = boost_by_coverage(articles)
 
     # Sort descending by score
     articles.sort(key=lambda a: a.score, reverse=True)

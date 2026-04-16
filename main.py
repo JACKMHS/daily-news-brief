@@ -47,25 +47,20 @@ from database import (
 logger = logging.getLogger(__name__)
 
 
-# ── Shared fetch + global summarise ──────────────────────────────────────────
+# ── Shared fetch (no summarise) ───────────────────────────────────────────────
 
-def _fetch_and_summarise_global(no_cache: bool = False) -> tuple[list, list]:
+def _fetch_candidate_pool(no_cache: bool = False) -> list:
     """
-    Fetch articles, globally rank the top ~15, summarise them all once.
+    Fetch articles and return a globally ranked diverse candidate pool.
 
-    Returns (top_articles, summaries) — summaries are shared across all
-    subscribers so we only call the LLM once per article per day regardless
-    of subscriber count.
+    No LLM call here — summarisation happens once per language group in
+    run_daily_for_subscribers so we don't pay twice for bilingual users.
+    Pool size = 6× TOP_N so even subscribers with niche topics find matches.
     """
-    # Fetch from ALL feeds so every topic category is represented
     articles = fetch.fetch_all_feeds()
     if not articles:
-        return [], []
+        return []
 
-    # Use a large, recency-only ranked pool — no AI keyword bias.
-    # Each subscriber's topic boost (applied in _personalise) then picks
-    # the right stories from this diverse pool.
-    # Pool size = 6× TOP_N so even subscribers with niche topics find matches.
     pool_size = max(config.TOP_N * 6, 30)
 
     if no_cache:
@@ -74,15 +69,9 @@ def _fetch_and_summarise_global(no_cache: bool = False) -> tuple[list, list]:
             a.score = rank._recency_score(rank._age_hours(a))
         articles.sort(key=lambda a: a.score, reverse=True)
         articles = rank.deduplicate(articles)
-        top_articles = articles[:pool_size]
+        return articles[:pool_size]
     else:
-        top_articles = rank.select_candidate_pool(articles, pool_size=pool_size)
-
-    if not top_articles:
-        return [], []
-
-    summaries = summarize.summarise_all(top_articles)
-    return top_articles, summaries
+        return rank.select_candidate_pool(articles, pool_size=pool_size)
 
 
 # ── Personalise for one subscriber ───────────────────────────────────────────
@@ -214,22 +203,38 @@ def run_daily_for_subscribers(no_cache: bool = False) -> tuple[int, int]:
 
     logger.info("Active subscribers: %d", len(subscribers))
 
-    # ── 1+2. Shared fetch & summarise ────────────────────────────────────────
-    logger.info("Fetching and summarising global article pool …")
-    top_articles, global_summaries = _fetch_and_summarise_global(no_cache=no_cache)
+    # ── 1. Shared fetch + rank ───────────────────────────────────────────────
+    logger.info("Fetching global article pool …")
+    top_articles = _fetch_candidate_pool(no_cache=no_cache)
 
-    if not global_summaries:
+    if not top_articles:
+        logger.warning("No articles in pool — skipping all sends.")
+        return 0, len(subscribers)
+
+    # ── 3. Summarise once per language group ──────────────────────────────────
+    from collections import defaultdict
+    by_lang: dict[str, list] = defaultdict(list)
+    for sub in subscribers:
+        by_lang[sub.language].append(sub)
+
+    lang_summaries: dict[str, list] = {}
+    for lang in by_lang:
+        logger.info("Summarising pool in language=%s …", lang)
+        lang_summaries[lang] = summarize.summarise_all(top_articles, language=lang)
+
+    if not any(lang_summaries.values()):
         logger.warning("No summaries produced — skipping all sends.")
         return 0, len(subscribers)
 
-    # ── 3. Send personalised brief to each subscriber ─────────────────────────
+    # ── 4. Send personalised brief to each subscriber ─────────────────────────
     sent = 0
     failed = 0
 
     for sub in subscribers:
         try:
+            summaries_for_lang = lang_summaries.get(sub.language) or lang_summaries.get("en", [])
             _, personal_summaries = _personalise(
-                top_articles, global_summaries, sub, config.TOP_N
+                top_articles, summaries_for_lang, sub, config.TOP_N
             )
 
             if not personal_summaries:
@@ -237,11 +242,15 @@ def run_daily_for_subscribers(no_cache: bool = False) -> tuple[int, int]:
                 continue
 
             name_tag = f" · {sub.name}" if sub.name else ""
-            brief_title = f"Daily AI Brief{name_tag} {today}"
+            lang = sub.language
+            brief_title = (
+                f"每日新闻简报{name_tag} {today}" if lang == "zh"
+                else f"Daily News Brief{name_tag} {today}"
+            )
 
             # Append unsubscribe link to body
             unsub_url = f"https://YOUR_DOMAIN/unsubscribe?token={sub.unsubscribe_token}"
-            brief_body = summarize.format_brief(personal_summaries, date_str=today)
+            brief_body = summarize.format_brief(personal_summaries, date_str=today, language=lang)
             brief_body += f"\n\n[Unsubscribe]({unsub_url})"
 
             ok = push.push(

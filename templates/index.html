@@ -201,11 +201,27 @@
       {% endfor %}
     </div>
 
-    <!-- Step 2: Name -->
+    <!-- Step 2: Name + Language -->
     <div class="card">
       <div class="card-title"><span class="step-num">2</span>Your name <span style="font-weight:400;color:var(--muted);font-size:.88rem">&nbsp;(optional)</span></div>
-      <div class="field" style="margin-bottom:0">
+      <div class="field">
         <input type="text" name="name" placeholder="e.g. Alex" maxlength="60"/>
+      </div>
+
+      <div class="card-title" style="margin-top:20px"><span class="step-num" style="background:var(--accent)">EN</span>Brief language</div>
+      <p class="card-sub">Choose the language for your daily brief.</p>
+      <input type="hidden" name="language" id="lang_input" value="en"/>
+      <div style="display:flex;gap:10px">
+        <button type="button" id="lang-en" onclick="setLang('en')"
+          style="flex:1;padding:12px;background:rgba(108,92,231,.18);border:2px solid var(--brand);
+                 border-radius:10px;color:#a29bfe;font-weight:700;font-size:.9rem;cursor:pointer">
+          🇺🇸 English
+        </button>
+        <button type="button" id="lang-zh" onclick="setLang('zh')"
+          style="flex:1;padding:12px;background:var(--card);border:2px solid var(--border);
+                 border-radius:10px;color:var(--muted);font-weight:700;font-size:.9rem;cursor:pointer">
+          🇨🇳 中文
+        </button>
       </div>
     </div>
 
@@ -292,6 +308,16 @@
 
 <script>
   var activeMethod = 'email';
+
+  function setLang(lang) {
+    document.getElementById('lang_input').value = lang;
+    var enBtn = document.getElementById('lang-en');
+    var zhBtn = document.getElementById('lang-zh');
+    var active = 'background:rgba(108,92,231,.18);border:2px solid var(--brand);border-radius:10px;color:#a29bfe;font-weight:700;font-size:.9rem;cursor:pointer;flex:1;padding:12px';
+    var inactive = 'background:var(--card);border:2px solid var(--border);border-radius:10px;color:var(--muted);font-weight:700;font-size:.9rem;cursor:pointer;flex:1;padding:12px';
+    enBtn.style.cssText = (lang === 'en' ? active : inactive);
+    zhBtn.style.cssText = (lang === 'zh' ? active : inactive);
+  }
 
   function switchMethod(method, tabEl) {
     // Hide all panels

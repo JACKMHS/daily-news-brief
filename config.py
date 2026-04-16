@@ -70,7 +70,8 @@ ALL_FEEDS: list[tuple[str, str]] = [
     ("https://www.aljazeera.com/xml/rss/all.xml",           "world"),
     ("https://feeds.npr.org/1004/rss.xml",                  "world"),
 
-    # Sports
+    # Sports (Google News sports = trending, editorially ranked)
+    ("https://news.google.com/rss/topics/CAAqJggKIiBDQkFTRWdvSUwyMHZNRFp1ZEdvU0FtVnVLQUFQAQ?hl=en-US&gl=US&ceid=US:en", "sports"),
     ("https://www.espn.com/espn/rss/news",                  "sports"),
     ("http://feeds.bbci.co.uk/sport/rss.xml",               "sports"),
     ("https://www.skysports.com/rss/12040",                 "sports"),

@@ -74,6 +74,7 @@ def subscribe():
     delivery_target = request.form.get("delivery_target", "").strip()
     selected_topics = request.form.getlist("topics")
     name            = request.form.get("name", "").strip()
+    language        = request.form.get("language", "en").strip()
 
     if not delivery_target:
         flash("Please fill in your delivery address.", "error")
@@ -89,6 +90,7 @@ def subscribe():
             delivery_target=delivery_target,
             topics=selected_topics,
             name=name,
+            language=language,
         )
         return render_template(
             "success.html",

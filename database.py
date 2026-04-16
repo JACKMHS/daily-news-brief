@@ -161,6 +161,7 @@ class Subscriber:
     created_at: str
     active: bool
     unsubscribe_token: str
+    language: str = "en"    # 'en' | 'zh'
 
 
 # ── DB connection ─────────────────────────────────────────────────────────────
@@ -195,7 +196,8 @@ def init_db() -> None:
                 topics            TEXT    NOT NULL DEFAULT '[]',
                 created_at        TEXT    NOT NULL,
                 active            INTEGER NOT NULL DEFAULT 1,
-                unsubscribe_token TEXT    NOT NULL UNIQUE
+                unsubscribe_token TEXT    NOT NULL UNIQUE,
+                language          TEXT    NOT NULL DEFAULT 'en'
             )
         """)
 
@@ -225,6 +227,12 @@ def init_db() -> None:
             con.execute("ALTER TABLE subscribers_new RENAME TO subscribers")
             logger.info("Migration complete.")
 
+        # Migration: add language column if missing (added in v2)
+        cols = {r[1] for r in con.execute("PRAGMA table_info(subscribers)")}
+        if "language" not in cols:
+            con.execute("ALTER TABLE subscribers ADD COLUMN language TEXT NOT NULL DEFAULT 'en'")
+            logger.info("Migration: added language column.")
+
         con.execute("""
             CREATE TABLE IF NOT EXISTS send_log (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -245,6 +253,7 @@ def add_subscriber(
     delivery_target: str,
     topics: list[str],
     name: str = "",
+    language: str = "en",
 ) -> Subscriber:
     """
     Insert a new subscriber or reactivate an existing one with the same target.
@@ -276,6 +285,7 @@ def add_subscriber(
     if not valid_topics:
         raise ValueError("Please select at least one topic.")
 
+    lang = language if language in ("en", "zh") else "en"
     token = secrets.token_hex(20)
     now = datetime.now(timezone.utc).isoformat()
 
@@ -287,16 +297,16 @@ def add_subscriber(
 
         if existing:
             con.execute(
-                "UPDATE subscribers SET name=?, topics=?, active=1, created_at=? WHERE id=?",
-                (name, json.dumps(valid_topics), now, existing["id"]),
+                "UPDATE subscribers SET name=?, topics=?, language=?, active=1, created_at=? WHERE id=?",
+                (name, json.dumps(valid_topics), lang, now, existing["id"]),
             )
             row = con.execute("SELECT * FROM subscribers WHERE id=?", (existing["id"],)).fetchone()
         else:
             con.execute(
                 """INSERT INTO subscribers
-                   (name, delivery_method, delivery_target, topics, created_at, active, unsubscribe_token)
-                   VALUES (?, ?, ?, ?, ?, 1, ?)""",
-                (name, method, target, json.dumps(valid_topics), now, token),
+                   (name, delivery_method, delivery_target, topics, created_at, active, unsubscribe_token, language)
+                   VALUES (?, ?, ?, ?, ?, 1, ?, ?)""",
+                (name, method, target, json.dumps(valid_topics), now, token, lang),
             )
             row = con.execute(
                 "SELECT * FROM subscribers WHERE delivery_target=? AND delivery_method=?",
@@ -405,6 +415,7 @@ def _row_to_sub(row: sqlite3.Row) -> Subscriber:
         created_at=row["created_at"],
         active=bool(row["active"]),
         unsubscribe_token=row["unsubscribe_token"],
+        language=row["language"] if "language" in row.keys() else "en",
     )
 
 
