@@ -1,0 +1,54 @@
+name: Daily News Brief
+
+on:
+  # Runs at 00:00 UTC = 08:00 CST every day
+  schedule:
+    - cron: '0 0 * * *'
+
+  # Manual trigger from GitHub Actions tab (for testing)
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (print brief, do not push)'
+        type: boolean
+        default: false
+
+jobs:
+  send-brief:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Trigger daily brief on Railway
+        run: |
+          echo "Triggering daily brief at $(date -u '+%Y-%m-%d %H:%M UTC')"
+
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            echo "DRY RUN — skipping actual send"
+            exit 0
+          fi
+
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "${{ secrets.APP_URL }}/admin/run" \
+            -H "X-Admin-Secret: ${{ secrets.ADMIN_SECRET }}" \
+            --max-time 120)
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -1)
+
+          echo "Response: $BODY"
+          echo "HTTP status: $HTTP_CODE"
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "ERROR: Request failed with status $HTTP_CODE"
+            exit 1
+          fi
+
+          # Parse sent/failed counts from JSON response
+          SENT=$(echo "$BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('sent',0))" 2>/dev/null || echo "?")
+          FAILED=$(echo "$BODY" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('failed',0))" 2>/dev/null || echo "?")
+          echo "Result: sent=$SENT failed=$FAILED"
+
+          if [ "$FAILED" != "0" ] && [ "$FAILED" != "?" ]; then
+            echo "WARNING: $FAILED sends failed"
+          fi
