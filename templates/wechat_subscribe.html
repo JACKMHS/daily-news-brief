@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Choose Topics — Daily Brief</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{--brand:#6C5CE7;--bg:#0F1117;--surface:#1A1D2E;--card:#222640;
+          --border:#2e3254;--text:#E8EAF6;--muted:#8892B0}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+         background:var(--bg);color:var(--text);padding:20px;min-height:100vh}
+    h1{font-size:1.4rem;font-weight:800;margin-bottom:8px;
+       background:linear-gradient(135deg,#fff,#a29bfe);
+       -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .sub{font-size:.9rem;color:var(--muted);margin-bottom:24px}
+    .cat-label{font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+      color:var(--muted);margin:18px 0 8px;display:flex;align-items:center;gap:8px}
+    .cat-label::after{content:"";flex:1;height:1px;background:var(--border)}
+    .topic-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:4px}
+    .topic-label{position:relative;cursor:pointer}
+    .topic-label input{position:absolute;opacity:0;width:0;height:0}
+    .topic-card{display:flex;flex-direction:column;align-items:center;gap:5px;
+      padding:14px 8px;background:var(--card);border:2px solid var(--border);
+      border-radius:10px;transition:all .15s;text-align:center}
+    .topic-card .ti{font-size:1.4rem}
+    .topic-card .tn{font-size:.73rem;font-weight:600;color:var(--muted);line-height:1.3}
+    .topic-label input:checked+.topic-card{border-color:var(--brand);background:rgba(108,92,231,.13)}
+    .topic-label input:checked+.topic-card .tn{color:#a29bfe}
+    .field{margin:20px 0 10px}
+    .field input{width:100%;background:var(--card);border:1px solid var(--border);
+      border-radius:10px;color:var(--text);font-size:.95rem;padding:12px 15px;outline:none}
+    .field input:focus{border-color:var(--brand)}
+    .btn{width:100%;padding:14px;background:linear-gradient(135deg,#6C5CE7,#5849c2);
+      color:#fff;font-size:1rem;font-weight:700;border:none;border-radius:12px;
+      cursor:pointer;margin-top:8px}
+  </style>
+</head>
+<body>
+  <h1>One last step, {{ nickname or "friend" }}!</h1>
+  <p class="sub">Choose the topics for your daily brief. We'll deliver it to your WeChat automatically.</p>
+
+  <form action="/subscribe" method="POST">
+    <input type="hidden" name="delivery_method" value="wechat_oa"/>
+    <input type="hidden" name="delivery_target" value="{{ openid }}"/>
+
+    {% for cat_name, topic_ids in topic_categories.items() %}
+    <div class="cat-label">{{ cat_name }}</div>
+    <div class="topic-grid">
+      {% for tid in topic_ids %}
+      {% set t = topics[tid] %}
+      <label class="topic-label">
+        <input type="checkbox" name="topics" value="{{ tid }}"/>
+        <div class="topic-card">
+          <span class="ti">{{ t.icon }}</span>
+          <span class="tn">{{ t.label }}</span>
+        </div>
+      </label>
+      {% endfor %}
+    </div>
+    {% endfor %}
+
+    <div class="field">
+      <input type="text" name="name" placeholder="Your name (optional)" maxlength="60"
+             value="{{ nickname }}"/>
+    </div>
+
+    <button type="submit" class="btn">Subscribe →</button>
+  </form>
+</body>
+</html>

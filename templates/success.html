@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>You're subscribed — Daily AI Brief</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --brand: #6C5CE7; --bg: #0F1117; --surface: #1A1D2E;
+      --border: #2e3254; --text: #E8EAF6; --muted: #8892B0;
+      --success: #00B894; --radius: 14px;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg); color: var(--text); line-height: 1.6;
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 48px 40px;
+      max-width: 520px; width: 100%; text-align: center;
+    }
+    .checkmark {
+      width: 72px; height: 72px;
+      background: rgba(0,184,148,0.12);
+      border: 2px solid rgba(0,184,148,0.4);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2rem; margin: 0 auto 28px;
+    }
+    h1 { font-size: 1.8rem; font-weight: 800; margin-bottom: 12px; }
+    .subtitle { color: var(--muted); margin-bottom: 32px; font-size: 0.95rem; }
+    .topics-row {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      justify-content: center; margin-bottom: 32px;
+    }
+    .topic-chip {
+      background: rgba(108,92,231,0.15); border: 1px solid rgba(108,92,231,0.35);
+      color: #a29bfe; border-radius: 100px; padding: 5px 14px;
+      font-size: 0.83rem; font-weight: 600;
+    }
+    .info-box {
+      background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+      border-radius: 10px; padding: 18px 20px;
+      font-size: 0.875rem; color: var(--muted);
+      text-align: left; margin-bottom: 32px; line-height: 1.7;
+    }
+    .info-box strong { color: var(--text); }
+    .btn {
+      display: inline-block; padding: 12px 28px;
+      background: linear-gradient(135deg, #6C5CE7, #5849c2);
+      color: #fff; border-radius: 10px; text-decoration: none;
+      font-weight: 700; font-size: 0.95rem;
+    }
+    .unsub-link {
+      display: block; margin-top: 20px;
+      font-size: 0.82rem; color: #444a6d; text-decoration: none;
+    }
+    .unsub-link:hover { color: var(--muted); }
+  </style>
+</head>
+<body>
+<div class="card">
+  <div class="checkmark">✓</div>
+  <h1>You're in, {{ name }}!</h1>
+  <p class="subtitle">Your daily AI brief will arrive every morning on WeChat via Server酱.</p>
+
+  {% if topics %}
+  <div class="topics-row">
+    {% for t in topics %}
+    <span class="topic-chip">{{ t.icon }} {{ t.label }}</span>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="info-box">
+    <strong>What happens next:</strong><br>
+    • Delivery method: <strong>{{ delivery_label }}</strong><br>
+    • Your first brief arrives tomorrow morning (08:00 CST)<br>
+    • Top 5 stories personalised to your chosen topics<br>
+    • Each story paraphrased by Claude — no raw RSS blurbs<br>
+    • Unsubscribe any time with one click
+  </div>
+
+  <a href="/" class="btn">← Back to home</a>
+  <a href="/unsubscribe?token={{ unsubscribe_token }}" class="unsub-link">
+    Unsubscribe from this newsletter
+  </a>
+</div>
+</body>
+</html>

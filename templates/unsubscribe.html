@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Unsubscribe — Daily AI Brief</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0F1117; --surface: #1A1D2E; --border: #2e3254;
+      --text: #E8EAF6; --muted: #8892B0; --radius: 14px;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg); color: var(--text); line-height: 1.6;
+      min-height: 100vh; display: flex; align-items: center;
+      justify-content: center; padding: 24px;
+    }
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 48px 40px;
+      max-width: 480px; width: 100%; text-align: center;
+    }
+    .icon { font-size: 3rem; margin-bottom: 20px; }
+    h1 { font-size: 1.6rem; font-weight: 800; margin-bottom: 12px; }
+    p { color: var(--muted); font-size: 0.95rem; margin-bottom: 28px; }
+    .btn {
+      display: inline-block; padding: 12px 28px;
+      background: linear-gradient(135deg, #6C5CE7, #5849c2);
+      color: #fff; border-radius: 10px; text-decoration: none;
+      font-weight: 700; font-size: 0.95rem;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+
+  {% if status == "success" %}
+    <div class="icon">👋</div>
+    <h1>You've been unsubscribed</h1>
+    <p>We've removed you from the Daily AI Brief. No more messages will be sent to your WeChat. Sorry to see you go!</p>
+    <a href="/" class="btn">Resubscribe anytime →</a>
+
+  {% elif status == "not_found" %}
+    <div class="icon">🔍</div>
+    <h1>Link not found</h1>
+    <p>That unsubscribe link is invalid or has already been used. You may already be unsubscribed.</p>
+    <a href="/" class="btn">Go home →</a>
+
+  {% else %}
+    <div class="icon">⚠️</div>
+    <h1>Invalid link</h1>
+    <p>The unsubscribe link is missing a token. Please use the link from your WeChat message.</p>
+    <a href="/" class="btn">Go home →</a>
+  {% endif %}
+
+</div>
+</body>
+</html>

@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Daily News Brief — Personalised newsletter to WeChat or Email</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --brand:#6C5CE7;--brand-dk:#5849c2;--accent:#00CEC9;
+      --bg:#0F1117;--surface:#1A1D2E;--card:#222640;--border:#2e3254;
+      --text:#E8EAF6;--muted:#8892B0;--success:#00B894;--danger:#FF7675;
+      --r:14px;
+    }
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+         background:var(--bg);color:var(--text);line-height:1.6}
+
+    /* ── Hero ── */
+    .hero{background:linear-gradient(135deg,#1a1d2e 0%,#0d1021 50%,#0f1117 100%);
+          border-bottom:1px solid var(--border);padding:64px 24px 52px;text-align:center;
+          position:relative;overflow:hidden}
+    .hero::before{content:"";position:absolute;inset:0;
+      background:radial-gradient(ellipse at 50% -20%,rgba(108,92,231,.22) 0%,transparent 65%);
+      pointer-events:none}
+    .hero-badge{display:inline-block;background:rgba(108,92,231,.18);
+      border:1px solid rgba(108,92,231,.4);color:#a29bfe;font-size:.78rem;
+      font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+      padding:5px 14px;border-radius:100px;margin-bottom:20px}
+    .hero h1{font-size:clamp(1.9rem,5vw,3.2rem);font-weight:800;line-height:1.15;
+      margin-bottom:16px;background:linear-gradient(135deg,#fff 30%,#a29bfe 100%);
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+    .hero p{font-size:1.05rem;color:var(--muted);max-width:500px;margin:0 auto 26px}
+    .hero-stats{display:inline-flex;gap:28px;background:rgba(255,255,255,.04);
+      border:1px solid var(--border);border-radius:100px;padding:9px 26px;
+      font-size:.87rem;color:var(--muted)}
+    .hero-stats strong{color:var(--text)}
+
+    /* ── Steps row ── */
+    .steps{display:flex;justify-content:center;gap:24px;flex-wrap:wrap;
+           padding:44px 24px 8px;max-width:800px;margin:0 auto}
+    .step{flex:1;min-width:180px;max-width:220px;text-align:center}
+    .step-icon{font-size:2rem;margin-bottom:10px}
+    .step h3{font-size:.9rem;font-weight:700;margin-bottom:4px}
+    .step p{font-size:.82rem;color:var(--muted)}
+
+    /* ── Form container ── */
+    .container{max-width:760px;margin:0 auto;padding:0 20px 80px}
+
+    .card{background:var(--surface);border:1px solid var(--border);
+          border-radius:var(--r);padding:32px;margin-bottom:20px}
+    .card-title{font-size:1rem;font-weight:700;margin-bottom:5px;
+      display:flex;align-items:center;gap:10px}
+    .step-num{width:25px;height:25px;background:var(--brand);border-radius:50%;
+      display:inline-flex;align-items:center;justify-content:center;
+      font-size:.75rem;font-weight:800;flex-shrink:0}
+    .card-sub{font-size:.84rem;color:var(--muted);margin-bottom:20px}
+
+    /* ── Category label ── */
+    .cat-label{font-size:.72rem;font-weight:700;letter-spacing:.1em;
+      text-transform:uppercase;color:var(--muted);margin:20px 0 10px;
+      display:flex;align-items:center;gap:8px}
+    .cat-label::after{content:"";flex:1;height:1px;background:var(--border)}
+
+    /* ── Topic grid ── */
+    .topic-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+    .topic-label{position:relative;cursor:pointer}
+    .topic-label input{position:absolute;opacity:0;width:0;height:0}
+    .topic-card{display:flex;flex-direction:column;align-items:center;justify-content:center;
+      gap:7px;padding:16px 10px;background:var(--card);border:2px solid var(--border);
+      border-radius:12px;transition:all .18s;user-select:none;text-align:center}
+    .topic-card .ti{font-size:1.65rem}
+    .topic-card .tn{font-size:.78rem;font-weight:600;color:var(--muted);line-height:1.3}
+    .topic-label input:checked+.topic-card{border-color:var(--brand);background:rgba(108,92,231,.13)}
+    .topic-label input:checked+.topic-card .tn{color:#a29bfe}
+    .topic-card:hover{border-color:#4a4f7a;transform:translateY(-2px)}
+
+    /* ── Delivery method tabs ── */
+    .method-tabs{display:flex;gap:10px;margin-bottom:22px;flex-wrap:wrap}
+    .method-tab{flex:1;min-width:130px;padding:14px 12px;background:var(--card);
+      border:2px solid var(--border);border-radius:12px;cursor:pointer;
+      text-align:center;transition:all .18s;user-select:none}
+    .method-tab .mt-icon{font-size:1.5rem;margin-bottom:6px}
+    .method-tab .mt-label{font-size:.8rem;font-weight:600;color:var(--muted)}
+    .method-tab.active{border-color:var(--brand);background:rgba(108,92,231,.13)}
+    .method-tab.active .mt-label{color:#a29bfe}
+
+    /* ── Delivery panels ── */
+    .delivery-panel{display:none}
+    .delivery-panel.active{display:block}
+
+    /* ── Fields ── */
+    .field{margin-bottom:16px}
+    .field label{display:block;font-size:.83rem;font-weight:600;color:var(--muted);
+      margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em}
+    .field input[type=text],.field input[type=email]{width:100%;background:var(--card);
+      border:1px solid var(--border);border-radius:10px;color:var(--text);
+      font-size:.95rem;padding:12px 15px;outline:none;transition:border-color .18s}
+    .field input:focus{border-color:var(--brand)}
+    .field input::placeholder{color:#444a6d}
+    .hint{font-size:.8rem;color:var(--muted);margin-top:6px;line-height:1.5}
+    .hint a{color:#a29bfe;text-decoration:none}
+    .hint a:hover{text-decoration:underline}
+
+    /* ── Info box ── */
+    .info-box{background:var(--card);border:1px solid var(--border);border-radius:10px;
+      padding:15px 18px;font-size:.83rem;color:var(--muted);margin-top:14px}
+    .info-box ol{padding-left:17px}
+    .info-box li{margin-bottom:5px}
+    .info-box strong{color:var(--text)}
+
+    /* ── WeChat OA special CTA ── */
+    .oa-cta{background:linear-gradient(135deg,rgba(0,206,201,.1),rgba(108,92,231,.1));
+      border:1px solid rgba(0,206,201,.3);border-radius:12px;padding:22px;text-align:center}
+    .oa-cta .oa-icon{font-size:2.5rem;margin-bottom:10px}
+    .oa-cta h3{font-size:1rem;font-weight:700;margin-bottom:8px}
+    .oa-cta p{font-size:.85rem;color:var(--muted);margin-bottom:16px}
+    .btn-oa{display:inline-block;padding:12px 28px;
+      background:linear-gradient(135deg,#00CEC9,#00b09b);
+      color:#fff;border-radius:10px;text-decoration:none;font-weight:700;font-size:.95rem}
+
+    /* ── Submit ── */
+    .btn-submit{width:100%;padding:15px;
+      background:linear-gradient(135deg,var(--brand),var(--brand-dk));
+      color:#fff;font-size:1rem;font-weight:700;border:none;border-radius:12px;
+      cursor:pointer;letter-spacing:.03em;transition:opacity .2s,transform .15s;
+      margin-top:4px}
+    .btn-submit:hover{opacity:.91;transform:translateY(-1px)}
+
+    /* ── Flash ── */
+    .flash-list{list-style:none;margin-bottom:18px}
+    .flash-list li{padding:12px 16px;border-radius:10px;font-size:.9rem;font-weight:500}
+    .flash-list li.error{background:rgba(255,118,117,.12);
+      border:1px solid rgba(255,118,117,.35);color:#ff9a99}
+
+    /* ── Footer ── */
+    footer{text-align:center;padding:28px 20px;font-size:.8rem;color:#3d4266;
+           border-top:1px solid var(--border)}
+    footer a{color:#5a5f88;text-decoration:none}
+
+    @media(max-width:520px){
+      .card{padding:22px 16px}
+      .topic-grid{grid-template-columns:repeat(2,1fr)}
+      .method-tabs{flex-direction:column}
+      .hero-stats{flex-direction:column;gap:8px;border-radius:12px}
+    }
+  </style>
+</head>
+<body>
+
+<section class="hero">
+  <div class="hero-badge">✦ Free Daily Newsletter</div>
+  <h1>Your News Brief,<br>personalised &amp; delivered daily</h1>
+  <p>Pick the topics you care about — AI, finance, sports, world affairs — and get a crisp Claude-powered summary every morning.</p>
+  <div class="hero-stats">
+    <span>📡 20+ curated sources</span>
+    <span>🧠 Claude-powered</span>
+    <span>👥 <strong>{{ subscriber_count }}</strong> subscribers</span>
+  </div>
+</section>
+
+<div class="steps">
+  <div class="step"><div class="step-icon">🗂️</div><h3>Pick your topics</h3><p>From AI research to sports scores — choose what matters to you.</p></div>
+  <div class="step"><div class="step-icon">🧠</div><h3>Claude summarises</h3><p>Each story rewritten in plain language — no jargon, no filler.</p></div>
+  <div class="step"><div class="step-icon">📬</div><h3>Arrives daily</h3><p>To your WeChat or inbox every morning. One click to unsubscribe.</p></div>
+</div>
+
+<div class="container">
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <ul class="flash-list">
+      {% for cat,msg in messages %}
+      <li class="{{ cat }}">⚠ {{ msg }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  {% endwith %}
+
+  <form action="/subscribe" method="POST" novalidate id="subform">
+    <input type="hidden" name="delivery_method" id="delivery_method_input" value="email"/>
+
+    <!-- Step 1: Topics -->
+    <div class="card">
+      <div class="card-title"><span class="step-num">1</span>Choose your topics</div>
+      <p class="card-sub">Select everything you want to see. We'll rank stories by your interests.</p>
+
+      {% for cat_name, topic_ids in topic_categories.items() %}
+      <div class="cat-label">{{ cat_name }}</div>
+      <div class="topic-grid" style="margin-bottom:4px">
+        {% for tid in topic_ids %}
+        {% set t = topics[tid] %}
+        <label class="topic-label">
+          <input type="checkbox" name="topics" value="{{ tid }}"/>
+          <div class="topic-card">
+            <span class="ti">{{ t.icon }}</span>
+            <span class="tn">{{ t.label }}</span>
+          </div>
+        </label>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Step 2: Name -->
+    <div class="card">
+      <div class="card-title"><span class="step-num">2</span>Your name <span style="font-weight:400;color:var(--muted);font-size:.88rem">&nbsp;(optional)</span></div>
+      <div class="field" style="margin-bottom:0">
+        <input type="text" name="name" placeholder="e.g. Alex" maxlength="60"/>
+      </div>
+    </div>
+
+    <!-- Step 3: Delivery -->
+    <div class="card">
+      <div class="card-title"><span class="step-num">3</span>How to receive it</div>
+      <p class="card-sub">Pick the option that works best for you.</p>
+
+      <div class="method-tabs">
+
+        <div class="method-tab active" onclick="switchMethod('email',this)">
+          <div class="mt-icon">📧</div>
+          <div class="mt-label">Email</div>
+        </div>
+
+        {% if wechat_oa_enabled %}
+        <div class="method-tab" onclick="switchMethod('wechat_oa',this)">
+          <div class="mt-icon">🟢</div>
+          <div class="mt-label">WeChat OA<br><span style="font-size:.72rem;opacity:.7">easiest</span></div>
+        </div>
+        {% endif %}
+
+        <div class="method-tab" onclick="switchMethod('serverchan',this)">
+          <div class="mt-icon">💬</div>
+          <div class="mt-label">WeChat<br><span style="font-size:.72rem;opacity:.7">via Server酱</span></div>
+        </div>
+
+      </div>
+
+      <!-- Email panel -->
+      <div class="delivery-panel active" id="panel-email">
+        <div class="field">
+          <label>Email address</label>
+          <input type="email" name="email_target" placeholder="you@example.com" autocomplete="email"/>
+        </div>
+        <p class="hint">Works with Gmail, QQ Mail, 163, Outlook — any email provider.</p>
+      </div>
+
+      <!-- WeChat OA panel -->
+      {% if wechat_oa_enabled %}
+      <div class="delivery-panel" id="panel-wechat_oa">
+        <div class="oa-cta">
+          <div class="oa-icon">📱</div>
+          <h3>Subscribe with one tap in WeChat</h3>
+          <p>Open the link below <strong>inside WeChat</strong>. We'll recognise you automatically — no account or password needed.</p>
+          <a href="/wechat/auth" class="btn-oa">Open in WeChat →</a>
+        </div>
+        <p class="hint" style="margin-top:12px;text-align:center">
+          This option requires you to open this page inside the WeChat app.
+        </p>
+      </div>
+      {% endif %}
+
+      <!-- Server酱 panel -->
+      <div class="delivery-panel" id="panel-serverchan">
+        <div class="field">
+          <label>Server酱 SendKey</label>
+          <input type="text" name="sc_target" placeholder="SCT..." autocomplete="off" spellcheck="false"/>
+          <p class="hint">Starts with <strong>SCT</strong>. Get yours free at <a href="https://sct.ftqq.com/" target="_blank" rel="noopener">sct.ftqq.com</a>.</p>
+        </div>
+        <div class="info-box">
+          <strong>How to get your key (30 seconds):</strong>
+          <ol>
+            <li>Visit <strong>sct.ftqq.com</strong> and scan the QR code with WeChat</li>
+            <li>Copy the <strong>SendKey</strong> (starts with SCT)</li>
+            <li>Paste it above</li>
+          </ol>
+        </div>
+      </div>
+
+    </div><!-- /card -->
+
+    <button type="submit" class="btn-submit" id="submit-btn">
+      Subscribe free →
+    </button>
+
+  </form>
+</div>
+
+<footer>
+  Daily Brief &nbsp;·&nbsp; Summaries are AI-generated — always check the source.
+  &nbsp;·&nbsp; <a href="/unsubscribe">Unsubscribe</a>
+</footer>
+
+<script>
+  var activeMethod = 'email';
+
+  function switchMethod(method, tabEl) {
+    // Hide all panels
+    document.querySelectorAll('.delivery-panel').forEach(function(p){p.classList.remove('active')});
+    document.querySelectorAll('.method-tab').forEach(function(t){t.classList.remove('active')});
+
+    // Show selected
+    var panel = document.getElementById('panel-' + method);
+    if(panel) panel.classList.add('active');
+    tabEl.classList.add('active');
+
+    document.getElementById('delivery_method_input').value = method;
+    activeMethod = method;
+
+    // Update button text
+    var labels = {email:'Subscribe free →', wechat_oa:'Subscribe free →', serverchan:'Subscribe free →'};
+    document.getElementById('submit-btn').textContent = labels[method] || 'Subscribe free →';
+  }
+
+  // On submit, copy the visible target field into the unified delivery_target field
+  document.getElementById('subform').addEventListener('submit', function(e){
+    var target = '';
+    if(activeMethod === 'email'){
+      target = (document.querySelector('[name=email_target]') || {}).value || '';
+    } else if(activeMethod === 'serverchan'){
+      target = (document.querySelector('[name=sc_target]') || {}).value || '';
+    } else if(activeMethod === 'wechat_oa'){
+      // OA goes through /wechat/auth, not this form — prevent submission
+      e.preventDefault();
+      window.location.href = '/wechat/auth';
+      return;
+    }
+
+    // Inject delivery_target
+    var inp = document.createElement('input');
+    inp.type = 'hidden';
+    inp.name = 'delivery_target';
+    inp.value = target;
+    this.appendChild(inp);
+  });
+</script>
+
+</body>
+</html>
