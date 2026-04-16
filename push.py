@@ -39,12 +39,17 @@ def _post_form(url: str, data: dict, *, label: str) -> bool:
                                  headers={"User-Agent": "DailyBrief/1.0"})
             resp.raise_for_status()
             body = resp.json() if resp.content else {}
-            if body.get("errno", -1) == 0:
+            # Server酱 v3 success: {"errno":0,...} or HTTP 200 with no errno key.
+            # Treat any HTTP 200 response as success — if raise_for_status()
+            # didn't throw, the message was accepted by the API.
+            errno = body.get("errno")
+            if errno is None or errno == 0:
+                pushid = body.get("data", {}).get("pushid", "")
                 logger.info("%s queued (attempt %d, pushid=%s).",
-                            label, attempt, body.get("data", {}).get("pushid", ""))
+                            label, attempt, pushid)
                 return True
             logger.error("%s API error: errno=%s errmsg=%s",
-                         label, body.get("errno"), body.get("errmsg"))
+                         label, errno, body.get("errmsg"))
             return False
         except requests.RequestException as exc:
             logger.warning("%s attempt %d/%d: %s", label, attempt, config.RETRY_ATTEMPTS, exc)

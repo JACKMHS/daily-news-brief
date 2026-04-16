@@ -57,22 +57,26 @@ def _fetch_and_summarise_global(no_cache: bool = False) -> tuple[list, list]:
     subscribers so we only call the LLM once per article per day regardless
     of subscriber count.
     """
+    # Fetch from ALL feeds so every topic category is represented
     articles = fetch.fetch_all_feeds()
     if not articles:
         return [], []
 
-    # Rank globally to get a broad candidate set (larger pool before topic boost)
-    candidate_n = max(config.TOP_N * 3, 15)
+    # Use a large, recency-only ranked pool — no AI keyword bias.
+    # Each subscriber's topic boost (applied in _personalise) then picks
+    # the right stories from this diverse pool.
+    # Pool size = 6× TOP_N so even subscribers with niche topics find matches.
+    pool_size = max(config.TOP_N * 6, 30)
 
     if no_cache:
         articles = rank.filter_by_age(articles)
         for a in articles:
-            a.score = rank.score_article(a)
+            a.score = rank._recency_score(rank._age_hours(a))
         articles.sort(key=lambda a: a.score, reverse=True)
         articles = rank.deduplicate(articles)
-        top_articles = articles[:candidate_n]
+        top_articles = articles[:pool_size]
     else:
-        top_articles = rank.select_top(articles, top_n=candidate_n)
+        top_articles = rank.select_candidate_pool(articles, pool_size=pool_size)
 
     if not top_articles:
         return [], []

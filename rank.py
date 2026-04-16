@@ -193,6 +193,48 @@ def update_cache(articles: list[Article]) -> None:
     logger.info("Cache updated with %d titles.", len(new_titles))
 
 
+# ── Multi-subscriber candidate pool ──────────────────────────────────────────
+
+def select_candidate_pool(
+    articles: list[Article],
+    pool_size: int,
+) -> list[Article]:
+    """
+    Build a *topic-diverse* candidate pool for multi-subscriber mode.
+
+    Unlike select_top(), this ranks by recency only — no AI keyword bias —
+    so sports, finance, and world articles score equally against AI articles.
+    Per-subscriber topic boosting in main.py then picks the right stories
+    for each person from this neutral pool.
+
+    Steps: age filter → cache filter → recency score → dedup → top pool_size
+    """
+    if not articles:
+        return []
+
+    articles = filter_by_age(articles)
+    if not articles:
+        return []
+
+    articles = filter_cached(articles)
+    if not articles:
+        return []
+
+    # Score by recency only — no topic/keyword bias
+    for art in articles:
+        art.score = _recency_score(_age_hours(art))
+
+    articles.sort(key=lambda a: a.score, reverse=True)
+    articles = deduplicate(articles)
+    selected = articles[:pool_size]
+
+    logger.info(
+        "Candidate pool: %d articles (recency-only, diverse topics).",
+        len(selected),
+    )
+    return selected
+
+
 # ── Main pipeline ─────────────────────────────────────────────────────────────
 
 def select_top(articles: list[Article], top_n: Optional[int] = None) -> list[Article]:
