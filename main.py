@@ -294,7 +294,7 @@ def main() -> None:
     args = _parse_args()
 
     try:
-        config.validate()
+        config.validate(multi_subscriber=args.all_subscribers)
     except EnvironmentError as exc:
         logger.critical("Configuration invalid: %s", exc)
         sys.exit(1)

@@ -127,22 +127,31 @@ RETRY_ATTEMPTS: int    = int(os.getenv("RETRY_ATTEMPTS", "3"))
 RETRY_BACKOFF: float   = float(os.getenv("RETRY_BACKOFF", "1.5"))
 
 
-def validate() -> None:
-    """Raise early with a helpful message if required config is missing."""
+def validate(multi_subscriber: bool = False) -> None:
+    """
+    Raise early with a helpful message if required config is missing.
+
+    Args:
+        multi_subscriber: True when running --all-subscribers mode.
+                          Skips single-user push-key checks because each
+                          subscriber carries their own delivery credentials.
+    """
     errors: list[str] = []
 
     if not ANTHROPIC_API_KEY:
         errors.append("ANTHROPIC_API_KEY is not set.")
 
-    # Single-user mode validation
-    if PUSH_MODE == "serverchan" and not SERVERCHAN_KEY:
-        errors.append("PUSH_MODE=serverchan but SERVERCHAN_KEY is not set.")
-    if PUSH_MODE == "wecom" and not WECOM_WEBHOOK:
-        errors.append("PUSH_MODE=wecom but WECOM_WEBHOOK is not set.")
-    if PUSH_MODE == "email" and not EMAIL_USER:
-        errors.append("PUSH_MODE=email but EMAIL_USER is not set.")
-    if PUSH_MODE not in ("serverchan", "wecom", "email"):
-        errors.append(f"PUSH_MODE must be serverchan/wecom/email, got: {PUSH_MODE!r}")
+    # Single-user push validation — not needed in multi-subscriber mode
+    # because every subscriber row stores its own key/address.
+    if not multi_subscriber:
+        if PUSH_MODE == "serverchan" and not SERVERCHAN_KEY:
+            errors.append("PUSH_MODE=serverchan but SERVERCHAN_KEY is not set.")
+        if PUSH_MODE == "wecom" and not WECOM_WEBHOOK:
+            errors.append("PUSH_MODE=wecom but WECOM_WEBHOOK is not set.")
+        if PUSH_MODE == "email" and not EMAIL_USER:
+            errors.append("PUSH_MODE=email but EMAIL_USER is not set.")
+        if PUSH_MODE not in ("serverchan", "wecom", "email"):
+            errors.append(f"PUSH_MODE must be serverchan/wecom/email, got: {PUSH_MODE!r}")
 
     if errors:
         for e in errors:
@@ -150,6 +159,6 @@ def validate() -> None:
         raise EnvironmentError("Invalid configuration. Fix the errors above and retry.")
 
     logger.info(
-        "Config OK - model=%s | push=%s | feeds=%d | top_n=%d",
-        ANTHROPIC_MODEL, PUSH_MODE, len(RSS_FEEDS), TOP_N,
+        "Config OK - model=%s | multi_subscriber=%s | feeds=%d | top_n=%d",
+        ANTHROPIC_MODEL, multi_subscriber, len(RSS_FEEDS), TOP_N,
     )

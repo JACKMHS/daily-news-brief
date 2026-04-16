@@ -81,12 +81,10 @@ jobs:
       - name: Run daily brief
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          SERVERCHAN_KEY:    ${{ secrets.SERVERCHAN_KEY }}
           EMAIL_HOST:        ${{ vars.EMAIL_HOST }}
           EMAIL_PORT:        ${{ vars.EMAIL_PORT }}
           EMAIL_USER:        ${{ secrets.EMAIL_USER }}
           EMAIL_PASS:        ${{ secrets.EMAIL_PASS }}
-          PUSH_MODE:         serverchan
           DB_PATH:           subscribers.db
           LOG_LEVEL:         INFO
         run: |
